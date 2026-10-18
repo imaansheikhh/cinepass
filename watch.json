@@ -1,0 +1,11 @@
+{
+  "poll_min_seconds": 120,
+  "poll_max_seconds": 420,
+  "targets": [
+    { "theatre_id": 7313 },
+    { "theatre_id": 7420 },
+    { "theatre_id": 7123 },
+    { "theatre_id": 7122 },
+    { "theatre_id": 7285 }
+  ]
+}

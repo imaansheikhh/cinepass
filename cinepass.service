@@ -1,0 +1,18 @@
+[Unit]
+Description=Cineplex showtime watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cinepass
+# unbuffered, else journalctl shows nothing until the process dies
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/cinepass/watcher.py
+Restart=always
+RestartSec=30
+# tiny footprint; cap it so a runaway can't eat the micro VM
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

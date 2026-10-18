@@ -1,0 +1,8 @@
+cpx-profile/
+.venv/
+*.html
+known_movies.json
+__pycache__/
+.DS_Store
+.claude/
+topic.txt
