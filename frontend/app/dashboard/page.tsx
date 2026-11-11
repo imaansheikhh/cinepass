@@ -18,6 +18,7 @@ import {
     onSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "../../lib/firebase";
+import FavouriteTheatres from "@/components/FavouriteTheatres";
 
 type Movie = {
     id: string;
@@ -347,9 +348,9 @@ export default function Dashboard() {
                             to receive personalized showtime alerts.
                         </p>
 
-                        <p className="mt-6 text-sm text-violet-400">
-                            Theatre selection coming soon
-                        </p>
+                        <div className="mt-6">
+                            <FavouriteTheatres user={user} />
+                        </div>
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-8">
