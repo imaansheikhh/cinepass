@@ -1,5 +1,15 @@
 
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+    onAuthStateChanged,
+    signOut,
+    type User,
+} from "firebase/auth";
+import { auth } from "../../lib/firebase";
 
 const stats = [
     {
@@ -23,9 +33,51 @@ const stats = [
 ];
 
 export default function Dashboard() {
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [signingOut, setSigningOut] = useState(false);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+                setLoading(false);
+            } else {
+                setUser(null);
+                router.replace("/login");
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
+    async function handleLogout() {
+        setSigningOut(true);
+
+        try {
+            await signOut(auth);
+            router.replace("/login");
+        } catch (error) {
+            console.error("Logout failed:", error);
+            setSigningOut(false);
+            alert("Unable to sign out. Please try again.");
+        }
+    }
+
+    if (loading || !user) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-[#080b14] text-white">
+                <p className="text-lg text-violet-400">
+                    Loading your CinePass dashboard...
+                </p>
+            </main>
+        );
+    }
+
     return (
         <main className="min-h-screen bg-[#080b14] text-white">
-            <nav className="flex items-center justify-between border-b border-white/10 px-8 py-6">
+            <nav className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-8 py-6">
                 <Link
                     href="/"
                     className="text-2xl font-bold text-violet-400"
@@ -33,28 +85,65 @@ export default function Dashboard() {
                     CinePass
                 </Link>
 
-                <Link
-                    href="/"
-                    className="text-sm text-gray-400 hover:text-white"
-                >
-                    ← Back to Home
-                </Link>
+                <div className="flex flex-wrap items-center gap-5">
+                    <Link
+                        href="/"
+                        className="text-sm text-gray-400 hover:text-white"
+                    >
+                        ← Back to Home
+                    </Link>
+
+                    <button
+                        onClick={handleLogout}
+                        disabled={signingOut}
+                        className="rounded-xl border border-violet-500/40 px-5 py-2 text-sm font-semibold text-violet-300 transition hover:bg-violet-600 hover:text-white disabled:opacity-50"
+                    >
+                        {signingOut ? "Signing Out..." : "Sign Out"}
+                    </button>
+                </div>
             </nav>
 
             <div className="mx-auto max-w-6xl px-6 py-12">
-                <div className="mb-12">
-                    <p className="mb-3 text-sm font-medium text-violet-400">
-                        YOUR MOVIE HUB
-                    </p>
+                <div className="mb-10 flex flex-wrap items-center justify-between gap-6">
+                    <div>
+                        <p className="mb-3 text-sm font-medium text-violet-400">
+                            YOUR MOVIE HUB
+                        </p>
 
-                    <h1 className="mb-4 text-4xl font-bold">
-                        Your Dashboard
-                    </h1>
+                        <h1 className="mb-4 text-4xl font-bold">
+                            Welcome, {user.displayName?.split(" ")[0] || "Movie Lover"}!
+                        </h1>
 
-                    <p className="text-gray-400">
-                        Keep track of your favourite movies, theatres,
-                        and showtime notifications.
-                    </p>
+                        <p className="text-gray-400">
+                            Keep track of your favourite movies, theatres,
+                            and showtime notifications.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                        {user.photoURL ? (
+                            <img
+                                src={user.photoURL}
+                                alt="Google profile"
+                                referrerPolicy="no-referrer"
+                                className="h-12 w-12 rounded-full object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-600 text-xl font-bold">
+                                {user.displayName?.charAt(0) || "U"}
+                            </div>
+                        )}
+
+                        <div>
+                            <p className="font-semibold">
+                                {user.displayName || "CinePass User"}
+                            </p>
+
+                            <p className="text-sm text-gray-400">
+                                {user.email}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-3">
