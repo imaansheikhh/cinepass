@@ -2,6 +2,7 @@
 "use client";
 
 import AddMovie from "../../components/AddMovie";
+import MovieSearch from "../../components/MovieSearch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,8 @@ import { auth, db } from "../../lib/firebase";
 type Movie = {
     id: string;
     title: string;
+    posterUrl?: string | null;
+    releaseDate?: string;
 };
 
 export default function Dashboard() {
@@ -49,6 +52,8 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (!user) {
+            setMovies([]);
+            setMoviesLoading(true);
             return;
         }
 
@@ -62,10 +67,16 @@ export default function Dashboard() {
         const unsubscribe = onSnapshot(
             watchlistRef,
             (snapshot) => {
-                const savedMovies = snapshot.docs.map((movieDoc) => ({
-                    id: movieDoc.id,
-                    title: movieDoc.data().title as string,
-                }));
+                const savedMovies = snapshot.docs.map((movieDoc) => {
+                    const data = movieDoc.data();
+
+                    return {
+                        id: movieDoc.id,
+                        title: data.title as string,
+                        posterUrl: data.posterUrl as string | null | undefined,
+                        releaseDate: data.releaseDate as string | undefined,
+                    };
+                });
 
                 setMovies(savedMovies);
                 setMoviesLoading(false);
@@ -266,38 +277,58 @@ export default function Dashboard() {
                             </h3>
 
                             <p className="max-w-sm text-sm text-gray-400">
-                                Add a movie below to start building your watchlist.
+                                Search for a movie below to start your watchlist.
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             {movies.map((movie) => (
                                 <div
                                     key={movie.id}
-                                    className="flex items-center justify-between gap-4 rounded-xl border border-violet-500/20 bg-[#181827] p-5"
+                                    className="flex gap-4 rounded-xl border border-violet-500/20 bg-[#181827] p-4"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-2xl">🎬</span>
+                                    {movie.posterUrl ? (
+                                        <img
+                                            src={movie.posterUrl}
+                                            alt={`${movie.title} poster`}
+                                            className="h-36 w-24 rounded-lg object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-36 w-24 shrink-0 items-center justify-center rounded-lg bg-white/10 text-3xl">
+                                            🎬
+                                        </div>
+                                    )}
 
-                                        <p className="font-semibold text-white">
+                                    <div className="flex min-w-0 flex-1 flex-col">
+                                        <h3 className="font-semibold text-white">
                                             {movie.title}
-                                        </p>
-                                    </div>
+                                        </h3>
 
-                                    <button
-                                        onClick={() => handleRemoveMovie(movie.id)}
-                                        disabled={removingId === movie.id}
-                                        className="rounded-lg border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
-                                    >
-                                        {removingId === movie.id
-                                            ? "Removing..."
-                                            : "Remove"}
-                                    </button>
+                                        {movie.releaseDate && (
+                                            <p className="mt-2 text-sm text-gray-400">
+                                                {movie.releaseDate}
+                                            </p>
+                                        )}
+
+                                        <button
+                                            onClick={() => handleRemoveMovie(movie.id)}
+                                            disabled={removingId === movie.id}
+                                            className="mt-auto self-start rounded-lg border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
+                                        >
+                                            {removingId === movie.id
+                                                ? "Removing..."
+                                                : "Remove"}
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </section>
+
+                <div className="mt-8">
+                    <MovieSearch />
+                </div>
 
                 <div className="mt-8">
                     <AddMovie />
