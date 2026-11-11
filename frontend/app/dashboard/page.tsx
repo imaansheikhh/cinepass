@@ -1,6 +1,7 @@
 
 "use client";
 
+import AddMovie from "../../components/AddMovie";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,48 +10,76 @@ import {
     signOut,
     type User,
 } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import {
+    collection,
+    deleteDoc,
+    doc,
+    onSnapshot,
+} from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
 
-const stats = [
-    {
-        title: "Tracked Movies",
-        value: "0",
-        description: "Movies you're watching",
-        icon: "🎬",
-    },
-    {
-        title: "Favourite Theatres",
-        value: "0",
-        description: "Your selected locations",
-        icon: "📍",
-    },
-    {
-        title: "Recent Alerts",
-        value: "0",
-        description: "Showtime notifications",
-        icon: "🔔",
-    },
-];
+type Movie = {
+    id: string;
+    title: string;
+};
 
 export default function Dashboard() {
     const router = useRouter();
+
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [signingOut, setSigningOut] = useState(false);
+    const [movies, setMovies] = useState<Movie[]>([]);
+    const [moviesLoading, setMoviesLoading] = useState(true);
+    const [movieError, setMovieError] = useState("");
+    const [removingId, setRemovingId] = useState<string | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                setLoading(false);
-            } else {
-                setUser(null);
+            setUser(currentUser);
+            setLoading(false);
+
+            if (!currentUser) {
                 router.replace("/login");
             }
         });
 
         return () => unsubscribe();
     }, [router]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+
+        const watchlistRef = collection(
+            db,
+            "users",
+            user.uid,
+            "watchlist"
+        );
+
+        const unsubscribe = onSnapshot(
+            watchlistRef,
+            (snapshot) => {
+                const savedMovies = snapshot.docs.map((movieDoc) => ({
+                    id: movieDoc.id,
+                    title: movieDoc.data().title as string,
+                }));
+
+                setMovies(savedMovies);
+                setMoviesLoading(false);
+                setMovieError("");
+            },
+            (error) => {
+                console.error("Failed to load watchlist:", error);
+                setMovieError("Unable to load your watchlist.");
+                setMoviesLoading(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, [user]);
 
     async function handleLogout() {
         setSigningOut(true);
@@ -64,6 +93,44 @@ export default function Dashboard() {
             alert("Unable to sign out. Please try again.");
         }
     }
+
+    async function handleRemoveMovie(movieId: string) {
+        if (!user) return;
+
+        setRemovingId(movieId);
+
+        try {
+            await deleteDoc(
+                doc(db, "users", user.uid, "watchlist", movieId)
+            );
+        } catch (error) {
+            console.error("Failed to remove movie:", error);
+            alert("Unable to remove the movie. Please try again.");
+        } finally {
+            setRemovingId(null);
+        }
+    }
+
+    const stats = [
+        {
+            title: "Tracked Movies",
+            value: moviesLoading ? "..." : String(movies.length),
+            description: "Movies you're watching",
+            icon: "🎬",
+        },
+        {
+            title: "Favourite Theatres",
+            value: "0",
+            description: "Your selected locations",
+            icon: "📍",
+        },
+        {
+            title: "Recent Alerts",
+            value: "0",
+            description: "Showtime notifications",
+            icon: "🔔",
+        },
+    ];
 
     if (loading || !user) {
         return (
@@ -172,38 +239,69 @@ export default function Dashboard() {
                 </div>
 
                 <section className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
-                    <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold">
-                                My Watchlist
-                            </h2>
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-bold">
+                            My Watchlist
+                        </h2>
 
-                            <p className="mt-2 text-sm text-gray-400">
-                                Movies you're currently tracking
-                            </p>
-                        </div>
-
-                        <button
-                            disabled
-                            className="cursor-not-allowed rounded-xl bg-violet-600/50 px-5 py-3 text-sm font-semibold text-white/70"
-                        >
-                            + Add Movie (Coming Soon)
-                        </button>
-                    </div>
-
-                    <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-8 text-center">
-                        <div className="mb-4 text-5xl">🎥</div>
-
-                        <h3 className="mb-2 text-lg font-semibold">
-                            Your watchlist is empty
-                        </h3>
-
-                        <p className="max-w-sm text-sm text-gray-400">
-                            Soon you'll be able to add movies and receive
-                            notifications when new Cineplex showtimes appear.
+                        <p className="mt-2 text-sm text-gray-400">
+                            Movies you're currently tracking
                         </p>
                     </div>
+
+                    {moviesLoading ? (
+                        <p className="text-gray-400">
+                            Loading your movies...
+                        </p>
+                    ) : movieError ? (
+                        <p className="text-red-400">
+                            {movieError}
+                        </p>
+                    ) : movies.length === 0 ? (
+                        <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-8 text-center">
+                            <div className="mb-4 text-5xl">🎥</div>
+
+                            <h3 className="mb-2 text-lg font-semibold">
+                                Your watchlist is empty
+                            </h3>
+
+                            <p className="max-w-sm text-sm text-gray-400">
+                                Add a movie below to start building your watchlist.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {movies.map((movie) => (
+                                <div
+                                    key={movie.id}
+                                    className="flex items-center justify-between gap-4 rounded-xl border border-violet-500/20 bg-[#181827] p-5"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-2xl">🎬</span>
+
+                                        <p className="font-semibold text-white">
+                                            {movie.title}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleRemoveMovie(movie.id)}
+                                        disabled={removingId === movie.id}
+                                        className="rounded-lg border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
+                                    >
+                                        {removingId === movie.id
+                                            ? "Removing..."
+                                            : "Remove"}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </section>
+
+                <div className="mt-8">
+                    <AddMovie />
+                </div>
 
                 <section className="mt-8 grid gap-6 md:grid-cols-2">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-8">
